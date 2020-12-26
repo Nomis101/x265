@@ -291,6 +291,7 @@ void x265_param_default(x265_param* param)
     param->reconfigWindowSize = 0;
     param->decoderVbvMaxRate = 0;
     param->bliveVBV2pass = 0;
+    param->rc.bAutoAq = 0;
 
     /* Video Usability Information (VUI) */
     param->vui.aspectRatioIdc = 0;
@@ -1234,6 +1235,7 @@ int x265_param_parse(x265_param* p, const char* name, const char* value)
         OPT("multi-pass-opt-analysis") p->analysisMultiPassRefine = atobool(value);
         OPT("multi-pass-opt-distortion") p->analysisMultiPassDistortion = atobool(value);
         OPT("aq-motion") p->bAQMotion = atobool(value);
+        OPT("auto-aq") p->rc.bAutoAq = atobool(value);
         OPT("dynamic-rd") p->dynamicRd = atof(value);
         OPT("analysis-reuse-level")
         {
@@ -1628,7 +1630,7 @@ int x265_check_params(x265_param* param)
           "Lookahead depth must be less than 256");
     CHECK(param->lookaheadSlices > 16 || param->lookaheadSlices < 0,
           "Lookahead slices must between 0 and 16");
-    CHECK(param->rc.aqMode < X265_AQ_NONE || X265_AQ_EDGE < param->rc.aqMode,
+    CHECK(param->rc.aqMode < X265_AQ_NONE || param->rc.aqMode > X265_AQ_EDGE_BIASED,
           "Aq-Mode is out of range");
     CHECK(param->rc.aqStrength < 0 || param->rc.aqStrength > 3,
           "Aq-Strength is out of range");
@@ -1914,9 +1916,12 @@ void x265_print_params(x265_param* param)
              param->maxNumReferences, (param->limitReferences & X265_REF_LIMIT_CU) ? "on" : "off",
              (param->limitReferences & X265_REF_LIMIT_DEPTH) ? "on" : "off");
 
-    if (param->rc.aqMode)
+    if (param->rc.aqMode && !param->rc.bAutoAq)
         x265_log(param, X265_LOG_INFO, "AQ: mode / str / qg-size / cu-tree  : %d / %0.1f / %d / %d\n", param->rc.aqMode,
                  param->rc.aqStrength, param->rc.qgSize, param->rc.cuTree);
+    else if (param->rc.bAutoAq)
+        x265_log(param, X265_LOG_INFO, "AQ: mode / str / qg-size / cu-tree  : auto / %0.1f / %d / %d\n", param->rc.aqStrength,
+                 param->rc.qgSize, param->rc.cuTree);
 
     if (param->bLossless)
         x265_log(param, X265_LOG_INFO, "Rate Control                        : Lossless\n");
@@ -2224,6 +2229,7 @@ char *x265_param2string(x265_param* p, int padx, int pady)
     s += sprintf(s, " hist-threshold=%.2f", p->edgeTransitionThreshold);
     BOOL(p->bOptCUDeltaQP, "opt-cu-delta-qp");
     BOOL(p->bAQMotion, "aq-motion");
+    BOOL(p->rc.bAutoAq, "auto-aq");
     BOOL(p->bEmitHDR10SEI, "hdr10");
     BOOL(p->bHDR10Opt, "hdr10-opt");
     BOOL(p->bDhdr10opt, "dhdr10-opt");
@@ -2510,6 +2516,7 @@ void x265_copy_params(x265_param* dst, x265_param* src)
     dst->rc.bEnableConstVbv = src->rc.bEnableConstVbv;
     dst->rc.hevcAq = src->rc.hevcAq;
     dst->rc.qpAdaptationRange = src->rc.qpAdaptationRange;
+    dst->rc.bAutoAq = src->rc.bAutoAq;
 
     dst->vui.aspectRatioIdc = src->vui.aspectRatioIdc;
     dst->vui.sarWidth = src->vui.sarWidth;

@@ -64,6 +64,7 @@ Frame::Frame()
     m_edgeBitPlane = NULL;
     m_edgeBitPic = NULL;
     m_isInsideWindow = 0;
+    m_frameAq = X265_AQ_NONE;
 }
 
 bool Frame::create(x265_param *param, float* quantOffsets)
@@ -104,7 +105,7 @@ bool Frame::create(x265_param *param, float* quantOffsets)
         CHECKED_MALLOC_ZERO(m_classifyCount, uint32_t, size);
     }
 
-    if (param->rc.aqMode == X265_AQ_EDGE || (param->rc.zonefileCount && param->rc.aqMode != 0))
+    if (param->rc.aqMode == X265_AQ_EDGE || param->rc.aqMode == X265_AQ_EDGE_BIASED || param->rc.bAutoAq || (param->rc.zonefileCount && param->rc.aqMode != 0))
     {
         uint32_t numCuInWidth = (param->sourceWidth + param->maxCUSize - 1) / param->maxCUSize;
         uint32_t numCuInHeight = (param->sourceHeight + param->maxCUSize - 1) / param->maxCUSize;
@@ -276,13 +277,9 @@ void Frame::destroy()
         X265_FREE_ZERO(m_classifyVariance);
         X265_FREE_ZERO(m_classifyCount);
     }
-
-    if (m_param->rc.aqMode == X265_AQ_EDGE || (m_param->rc.zonefileCount && m_param->rc.aqMode != 0))
-    {
         X265_FREE(m_edgePic);
         X265_FREE(m_gaussianPic);
         X265_FREE(m_thetaPic);
-    }
 
     if (m_param->recursionSkipMode == EDGE_BASED_RSKIP)
     {
